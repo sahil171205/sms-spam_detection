@@ -356,40 +356,24 @@ if page == "Dashboard":
 
             # Automatic Alarm Attempt
             # Browser may block autoplay with sound.
+           
+            # Automatic Spam Alarm - No Audio Player
             components.html("""
-            <audio id="spamAlarm" controls autoplay>
+            <audio id="spamAlarm" autoplay>
                 <source
                     src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"
                     type="audio/ogg">
             </audio>
 
             <script>
-                const alarm = document.getElementById(
-                    "spamAlarm"
-                );
-
+                const alarm = document.getElementById("spamAlarm");
+                alarm.volume = 1.0;
                 alarm.play().catch(function(error) {
-                    console.log(
-                        "Autoplay blocked by browser.",
-                        error
-                    );
+                    console.log("Autoplay blocked:", error);
                 });
             </script>
-            """, height=65)
+            """, height=0)
 
-            st.caption(
-                "If automatic sound is blocked, "
-                "press Play in the audio player."
-            )
-
-            if st.button("🔊 PLAY ALARM AGAIN"):
-                components.html("""
-                <audio controls autoplay>
-                    <source
-                        src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"
-                        type="audio/ogg">
-                </audio>
-                """, height=65)
 
         # ---------------- NORMAL RESULT ----------------
         else:
