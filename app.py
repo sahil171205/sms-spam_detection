@@ -81,25 +81,42 @@ except Exception as e:
 
 
 # ---------------- SPAM RULES ----------------
+
+# ---------------- SPAM RULES ----------------
 def check_suspicious_sms(message):
 
     patterns = [
+        # Lottery Scams
         r"\bwon\s+(a\s+)?lottery\b",
         r"\blottery\s+(winner|prize|ticket)\b",
         r"\byou\s+have\s+won\b",
         r"\bclaim\s+(your\s+)?(free\s+)?(prize|reward|cash)\b",
         r"\bcash\s+prize\b",
         r"\bjackpot\b",
-        r"\bselected\s+as\s+(a\s+)?(lucky\s+)?winner\b",
+
+        # Bank and KYC Fraud
+        r"\bbank\s+account\s+will\s+be\s+blocked\b",
+        r"\bverify\s+your\s+kyc\b",
+        r"\bupdate\s+your\s+kyc\s+immediately\b",
+        r"\baccount\s+(will\s+be\s+)?(blocked|suspended)\b",
+        r"\bkyc\s+(expired|pending|failed)\b",
+        r"\bverify\s+your\s+bank\s+account\b",
+
+        # OTP and Password Scams
+        r"\bshare\s+your\s+otp\b",
+        r"\bsend\s+(me\s+)?your\s+otp\b",
+        r"\bshare\s+your\s+password\b",
+
+        # Suspicious Prize Messages
         r"\bfree\s+entry\b",
-        r"\bclick\s+here\s+to\s+claim\b"
+        r"\bclick\s+here\s+to\s+claim\b",
+        r"\bselected\s+as\s+(a\s+)?(lucky\s+)?winner\b"
     ]
 
     return any(
         re.search(pattern, message, re.IGNORECASE)
         for pattern in patterns
     )
-
 
 # ---------------- SESSION STATE ----------------
 if "history" not in st.session_state:
