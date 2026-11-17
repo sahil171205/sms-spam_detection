@@ -1,0 +1,30 @@
+
+name: Train SMS Spam Model
+
+on:
+  workflow_dispatch:
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: pip install -r requirements.txt
+
+      - name: Train ML Model
+        run: python train_model.py
+
+      - name: Upload Trained Model
+        uses: actions/upload-artifact@v4
+        with:
+          name: spam-model
+          path: spam_model.pkl
