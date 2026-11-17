@@ -8,16 +8,22 @@ import html
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(
     page_title="SMS Spam Detection",
-    page_icon="📩",
-    layout="wide"
+    page_icon="🛡️",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
 # ---------------- CUSTOM CSS ----------------
 st.markdown("""
 <style>
 .stApp {
-    background-color: #07111f;
+    background: #07111f;
     color: white;
+}
+
+.block-container {
+    max-width: 1150px;
+    padding-top: 2rem;
 }
 
 h1, h2, h3, p, label {
@@ -44,22 +50,93 @@ h1, h2, h3, p, label {
 
 [data-testid="stMetric"] {
     background-color: #101d30;
-    padding: 15px;
-    border-radius: 12px;
     border: 1px solid #234568;
+    border-radius: 12px;
+    padding: 18px;
 }
 
 .stTextArea textarea {
     background-color: #101d30 !important;
     color: white !important;
-    border: 1px solid #0878d1;
-    border-radius: 10px;
+    border: 1px solid #0878d1 !important;
+    border-radius: 10px !important;
+}
+
+.alert-box {
+    padding: 25px;
+    border-radius: 15px;
+    text-align: center;
+    margin-top: 15px;
+}
+
+.spam-box {
+    background: #421414;
+    border: 2px solid #ff3030;
+}
+
+.normal-box {
+    background: #103528;
+    border: 2px solid #00ff88;
+}
+
+.alert-box h2,
+.alert-box h3 {
+    margin: 12px 0;
+}
+
+.spam-box h2,
+.spam-box h3 {
+    color: #ff5050 !important;
+}
+
+.normal-box h2,
+.normal-box h3 {
+    color: #00ff88 !important;
+}
+
+.alert-light {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    margin: 20px auto;
+}
+
+.red-light {
+    background: #ff2020;
+    animation: redblink 1s infinite;
+}
+
+.green-light {
+    background: #00ff88;
+    animation: greenblink 1s infinite;
+}
+
+@keyframes redblink {
+    0%, 100% {
+        opacity: 1;
+        box-shadow: 0 0 30px red;
+    }
+    50% {
+        opacity: 0.2;
+        box-shadow: 0 0 5px red;
+    }
+}
+
+@keyframes greenblink {
+    0%, 100% {
+        opacity: 1;
+        box-shadow: 0 0 30px #00ff88;
+    }
+    50% {
+        opacity: 0.25;
+        box-shadow: 0 0 5px #00ff88;
+    }
 }
 </style>
 """, unsafe_allow_html=True)
 
 
-# ---------------- LOAD TRAINED MODEL ----------------
+# ---------------- LOAD ML MODEL ----------------
 @st.cache_resource
 def load_model():
     with open("spam_model.pkl", "rb") as file:
@@ -74,27 +151,28 @@ try:
 except Exception as e:
     st.error("ML Model Loading Failed!")
     st.warning(
-        "Check whether spam_model.pkl exists in GitHub."
+        "Check spam_model.pkl in your GitHub repository."
     )
     st.code(str(e))
     st.stop()
 
 
 # ---------------- SPAM RULES ----------------
-
-# ---------------- SPAM RULES ----------------
 def check_suspicious_sms(message):
 
     patterns = [
-        # Lottery Scams
+        # Lottery Fraud
         r"\bwon\s+(a\s+)?lottery\b",
         r"\blottery\s+(winner|prize|ticket)\b",
         r"\byou\s+have\s+won\b",
         r"\bclaim\s+(your\s+)?(free\s+)?(prize|reward|cash)\b",
         r"\bcash\s+prize\b",
         r"\bjackpot\b",
+        r"\bfree\s+entry\b",
+        r"\bclick\s+here\s+to\s+claim\b",
+        r"\bselected\s+as\s+(a\s+)?(lucky\s+)?winner\b",
 
-        # Bank and KYC Fraud
+        # Bank / KYC Fraud
         r"\bbank\s+account\s+will\s+be\s+blocked\b",
         r"\bverify\s+your\s+kyc\b",
         r"\bupdate\s+your\s+kyc\s+immediately\b",
@@ -102,15 +180,16 @@ def check_suspicious_sms(message):
         r"\bkyc\s+(expired|pending|failed)\b",
         r"\bverify\s+your\s+bank\s+account\b",
 
-        # OTP and Password Scams
+        # OTP / Password Fraud
         r"\bshare\s+your\s+otp\b",
         r"\bsend\s+(me\s+)?your\s+otp\b",
         r"\bshare\s+your\s+password\b",
+        r"\bprovide\s+your\s+otp\b",
 
-        # Suspicious Prize Messages
-        r"\bfree\s+entry\b",
-        r"\bclick\s+here\s+to\s+claim\b",
-        r"\bselected\s+as\s+(a\s+)?(lucky\s+)?winner\b"
+        # Suspicious Payment Scams
+        r"\bpay\s+(a\s+)?(small\s+)?fee\s+to\s+claim\b",
+        r"\bclick\s+the\s+link\s+to\s+verify\b",
+        r"\bclaim\s+your\s+reward\b"
     ]
 
     return any(
@@ -118,21 +197,20 @@ def check_suspicious_sms(message):
         for pattern in patterns
     )
 
+
 # ---------------- SESSION STATE ----------------
-if "history" not in st.session_state:
-    st.session_state.history = []
+defaults = {
+    "history": [],
+    "result": None,
+    "message": "",
+    "spam_probability": 0.0,
+    "rule_detected": False,
+    "scan_id": 0
+}
 
-if "result" not in st.session_state:
-    st.session_state.result = None
-
-if "message" not in st.session_state:
-    st.session_state.message = ""
-
-if "spam_probability" not in st.session_state:
-    st.session_state.spam_probability = 0.0
-
-if "rule_detected" not in st.session_state:
-    st.session_state.rule_detected = False
+for key, value in defaults.items():
+    if key not in st.session_state:
+        st.session_state[key] = value
 
 
 # ---------------- SIDEBAR ----------------
@@ -157,33 +235,34 @@ st.sidebar.info("System Status: ACTIVE")
 if page == "Dashboard":
 
     st.title("📩 SMS SPAM DETECTION")
-    st.write("Machine Learning Based SMS Security System")
+    st.caption("Machine Learning Based SMS Security System")
 
     total = len(st.session_state.history)
 
     spam_count = sum(
-        1 for x in st.session_state.history
-        if x["result"] == "spam"
+        item["result"] == "spam"
+        for item in st.session_state.history
     )
 
     normal_count = sum(
-        1 for x in st.session_state.history
-        if x["result"] == "normal"
+        item["result"] == "normal"
+        for item in st.session_state.history
     )
 
-    c1, c2, c3 = st.columns(3)
+    col1, col2, col3 = st.columns(3)
 
-    c1.metric("Total Scans", total)
-    c2.metric("Spam Messages", spam_count)
-    c3.metric("Normal Messages", normal_count)
+    col1.metric("Total Scans", total)
+    col2.metric("Spam Messages", spam_count)
+    col3.metric("Normal Messages", normal_count)
 
-    st.markdown("---")
+    st.divider()
+
     st.subheader("🔍 SMS Security Scanner")
 
     message = st.text_area(
         "Enter your SMS:",
         value=st.session_state.message,
-        height=130,
+        height=140,
         placeholder="Enter or paste your SMS here..."
     )
 
@@ -192,9 +271,11 @@ if page == "Dashboard":
         use_container_width=True
     ):
 
-        if message.strip():
+        if not message.strip():
+            st.warning("Please enter an SMS first.")
 
-            # TF-IDF Transformation
+        else:
+            # TF-IDF Features
             msg_vector = vectorizer.transform(
                 [message]
             )
@@ -204,7 +285,7 @@ if page == "Dashboard":
                 model.predict(msg_vector)[0]
             ).lower().strip()
 
-            # Model Probability
+            # Probability
             probabilities = model.predict_proba(
                 msg_vector
             )[0]
@@ -217,7 +298,7 @@ if page == "Dashboard":
                 probabilities[spam_index]
             ) * 100
 
-            # Additional Spam Rules
+            # Rule-Based Detection
             suspicious = check_suspicious_sms(
                 message
             )
@@ -227,26 +308,26 @@ if page == "Dashboard":
             else:
                 result = "normal"
 
-            # Save Session Result
+            # Save Results
             st.session_state.result = result
             st.session_state.message = message
-            st.session_state.spam_probability = spam_probability
+            st.session_state.spam_probability = (
+                spam_probability
+            )
             st.session_state.rule_detected = suspicious
+
+            st.session_state.scan_id += 1
 
             st.session_state.history.insert(
                 0,
                 {
                     "message": message,
                     "result": result,
-                    "spam_probability": spam_probability
+                    "probability": spam_probability
                 }
             )
 
-        else:
-            st.warning("Please enter an SMS first.")
-
-
-    # ---------------- RESULT ----------------
+    # ---------------- RESULT DISPLAY ----------------
     if st.session_state.result is not None:
 
         result = st.session_state.result
@@ -254,60 +335,52 @@ if page == "Dashboard":
         if result == "spam":
 
             st.markdown("""
-            <div style="
-                background:#421414;
-                border:2px solid #ff3030;
-                padding:25px;
-                border-radius:15px;
-                text-align:center;
-            ">
-                <h1 style="color:#ff3030 !important;">
-                    ⚠️ SPAM MESSAGE DETECTED
-                </h1>
-
-                <h3 style="color:white !important;">
-                    SUSPICIOUS MESSAGE - BE CAREFUL
-                </h3>
-
-                <div style="
-                    width:35px;
-                    height:35px;
-                    border-radius:50%;
-                    background:#ff2020;
-                    margin:20px auto;
-                    box-shadow:0 0 30px red;
-                    animation:redblink 1s infinite;
-                "></div>
-
-                <h3 style="color:#ff3030 !important;">
-                    🔴 RED ALERT
-                </h3>
+            <div class="alert-box spam-box">
+                <h2>⚠️ SPAM MESSAGE DETECTED</h2>
+                <h3>SUSPICIOUS MESSAGE - BE CAREFUL</h3>
+                <div class="alert-light red-light"></div>
+                <h3>🔴 RED ALERT</h3>
             </div>
-
-            <style>
-            @keyframes redblink {
-                0%,100% {
-                    opacity:1;
-                    box-shadow:0 0 30px red;
-                }
-                50% {
-                    opacity:0.2;
-                    box-shadow:0 0 5px red;
-                }
-            }
-            </style>
             """, unsafe_allow_html=True)
 
             st.error(
                 "⚠️ Warning: This SMS may be fraudulent."
             )
 
-            if st.button("🔊 PLAY ALARM"):
+            # Automatic Alarm Attempt
+            # Browser may block autoplay with sound.
+            components.html("""
+            <audio id="spamAlarm" controls autoplay>
+                <source
+                    src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"
+                    type="audio/ogg">
+            </audio>
+
+            <script>
+                const alarm = document.getElementById(
+                    "spamAlarm"
+                );
+
+                alarm.play().catch(function(error) {
+                    console.log(
+                        "Autoplay blocked by browser.",
+                        error
+                    );
+                });
+            </script>
+            """, height=65)
+
+            st.caption(
+                "If automatic sound is blocked, "
+                "press Play in the audio player."
+            )
+
+            if st.button("🔊 PLAY ALARM AGAIN"):
                 components.html("""
                 <audio controls autoplay>
                     <source
-                    src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"
-                    type="audio/ogg">
+                        src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"
+                        type="audio/ogg">
                 </audio>
                 """, height=65)
 
@@ -315,56 +388,25 @@ if page == "Dashboard":
         else:
 
             st.markdown("""
-            <div style="
-                background:#103528;
-                border:2px solid #00ff88;
-                padding:25px;
-                border-radius:15px;
-                text-align:center;
-            ">
-                <h1 style="color:#00ff88 !important;">
-                    ✅ NORMAL MESSAGE
-                </h1>
-
-                <h3 style="color:white !important;">
-                    NO SPAM DETECTED
-                </h3>
-
-                <div style="
-                    width:35px;
-                    height:35px;
-                    border-radius:50%;
-                    background:#00ff88;
-                    margin:20px auto;
-                    box-shadow:0 0 30px #00ff88;
-                    animation:greenblink 1s infinite;
-                "></div>
-
-                <h3 style="color:#00ff88 !important;">
-                    🟢 GREEN SAFE
-                </h3>
+            <div class="alert-box normal-box">
+                <h2>✅ NORMAL MESSAGE</h2>
+                <h3>NO SPAM DETECTED</h3>
+                <div class="alert-light green-light"></div>
+                <h3>🟢 GREEN INDICATOR</h3>
             </div>
-
-            <style>
-            @keyframes greenblink {
-                0%,100% {
-                    opacity:1;
-                    box-shadow:0 0 30px #00ff88;
-                }
-                50% {
-                    opacity:0.25;
-                    box-shadow:0 0 5px #00ff88;
-                }
-            }
-            </style>
             """, unsafe_allow_html=True)
 
             st.success(
                 "✅ This message is classified as NORMAL."
             )
 
-        # ---------------- PROBABILITY ----------------
-        st.markdown("---")
+            st.caption(
+                "Normal classification does not guarantee safety."
+            )
+
+        # ---------------- ML ANALYSIS ----------------
+        st.divider()
+
         st.subheader("📊 ML Analysis")
 
         probability = st.session_state.spam_probability
@@ -380,12 +422,13 @@ if page == "Dashboard":
 
         if st.session_state.rule_detected:
             st.info(
-                "Suspicious keyword pattern detected. "
-                "The final result also uses rule-based detection."
+                "Suspicious pattern detected using "
+                "rule-based analysis."
             )
 
         st.caption(
-            "Probability is an ML estimate, not a safety guarantee."
+            "ML probability is an estimate, "
+            "not a guarantee of message safety."
         )
 
 
@@ -401,9 +444,7 @@ elif page == "Detection History":
             start=1
         ):
 
-            st.markdown(
-                f"**Scan {i}:**"
-            )
+            st.markdown(f"**Scan {i}**")
 
             st.text(item["message"])
 
@@ -412,7 +453,12 @@ elif page == "Detection History":
             else:
                 st.success("🟢 NORMAL MESSAGE")
 
-            st.markdown("---")
+            st.caption(
+                f"ML Spam Probability: "
+                f"{item['probability']:.2f}%"
+            )
+
+            st.divider()
 
         if st.button("🗑️ CLEAR HISTORY"):
 
@@ -436,8 +482,8 @@ elif page == "About Project":
     st.markdown("""
     ### SMS Spam Detection System
 
-    This project uses Machine Learning to identify
-    spam and normal SMS messages.
+    This project uses Machine Learning and
+    rule-based analysis to classify SMS messages.
 
     ### Technologies Used
 
@@ -451,22 +497,23 @@ elif page == "About Project":
 
     - SMS Spam Detection
     - Trained Machine Learning Model
-    - Lottery Scam Detection Rules
+    - Bank KYC Fraud Pattern Detection
+    - Lottery Scam Detection
     - Red Blinking Spam Alert
     - Green Blinking Normal Indicator
-    - Alarm Sound Button
+    - Alarm Sound
     - Spam Probability
     - Detection History
 
     ### Project Objective
 
-    To classify SMS messages and help identify
-    suspicious or unwanted messages.
+    To identify potentially suspicious SMS
+    messages using Machine Learning.
     """)
 
 
 # ---------------- FOOTER ----------------
-st.markdown("---")
+st.divider()
 
 st.caption(
     "🛡️ SMS Spam Detection | AI Cyber Security Project"
