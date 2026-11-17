@@ -1,24 +1,65 @@
 
 import streamlit as st
+import streamlit.components.v1 as components
 import pickle
 import re
 import html
 
-# ----------------------------------
-# PAGE CONFIGURATION
-# ----------------------------------
-
+# ---------------- PAGE CONFIG ----------------
 st.set_page_config(
-    page_title="AI SMS Spam Detector",
-    page_icon="🛡️",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    page_title="SMS Spam Detection",
+    page_icon="📩",
+    layout="wide"
 )
 
-# ----------------------------------
-# LOAD TRAINED MODEL
-# ----------------------------------
+# ---------------- CUSTOM CSS ----------------
+st.markdown("""
+<style>
+.stApp {
+    background-color: #07111f;
+    color: white;
+}
 
+h1, h2, h3, p, label {
+    color: white !important;
+}
+
+.stButton > button {
+    background: #0878d1;
+    color: white;
+    border-radius: 10px;
+    border: 1px solid #00aaff;
+    padding: 10px 20px;
+    font-weight: bold;
+}
+
+.stButton > button:hover {
+    background: #00aaff;
+    color: white;
+}
+
+[data-testid="stSidebar"] {
+    background-color: #101d30;
+}
+
+[data-testid="stMetric"] {
+    background-color: #101d30;
+    padding: 15px;
+    border-radius: 12px;
+    border: 1px solid #234568;
+}
+
+.stTextArea textarea {
+    background-color: #101d30 !important;
+    color: white !important;
+    border: 1px solid #0878d1;
+    border-radius: 10px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+# ---------------- LOAD TRAINED MODEL ----------------
 @st.cache_resource
 def load_model():
     with open("spam_model.pkl", "rb") as file:
@@ -29,307 +70,126 @@ def load_model():
 
 try:
     model, vectorizer = load_model()
+
 except Exception as e:
-    st.error("Unable to load trained ML model.")
-    st.exception(e)
+    st.error("ML Model Loading Failed!")
+    st.warning(
+        "Check whether spam_model.pkl exists in GitHub."
+    )
+    st.code(str(e))
     st.stop()
 
 
-# ----------------------------------
-# PROFESSIONAL WHITE + BLUE CSS
-# ----------------------------------
+# ---------------- SPAM RULES ----------------
+def check_suspicious_sms(message):
 
-st.markdown("""
-<style>
+    patterns = [
+        r"\bwon\s+(a\s+)?lottery\b",
+        r"\blottery\s+(winner|prize|ticket)\b",
+        r"\byou\s+have\s+won\b",
+        r"\bclaim\s+(your\s+)?(free\s+)?(prize|reward|cash)\b",
+        r"\bcash\s+prize\b",
+        r"\bjackpot\b",
+        r"\bselected\s+as\s+(a\s+)?(lucky\s+)?winner\b",
+        r"\bfree\s+entry\b",
+        r"\bclick\s+here\s+to\s+claim\b"
+    ]
 
-.stApp {
-    background-color: #f5f8fc;
-    color: #172b4d;
-}
-
-.block-container {
-    max-width: 1200px;
-    padding-top: 2rem;
-    padding-bottom: 3rem;
-}
-
-h1, h2, h3 {
-    color: #172b4d !important;
-}
-
-[data-testid="stSidebar"] {
-    background-color: #ffffff;
-    border-right: 1px solid #e4eaf3;
-}
-
-[data-testid="stSidebar"] * {
-    color: #172b4d;
-}
-
-[data-testid="stMetric"] {
-    background: white;
-    border: 1px solid #e4eaf3;
-    border-radius: 14px;
-    padding: 18px;
-}
-
-[data-testid="stMetricValue"] {
-    color: #1463df;
-}
-
-.stButton > button {
-    background: #1463df;
-    color: white;
-    border-radius: 10px;
-    border: none;
-    font-weight: 600;
-    padding: 12px 20px;
-    transition: 0.2s;
-}
-
-.stButton > button:hover {
-    background: #0b4db5;
-    color: white;
-    border: none;
-}
-
-.stTextArea textarea {
-    background-color: #ffffff !important;
-    color: #172b4d !important;
-    border: 1px solid #d8e2f0 !important;
-    border-radius: 12px !important;
-}
-
-.hero {
-    background: linear-gradient(
-        120deg,
-        #1463df,
-        #4396f5
-    );
-    border-radius: 20px;
-    padding: 35px;
-    color: white;
-    margin-bottom: 25px;
-}
-
-.hero h1 {
-    color: white !important;
-    font-size: 34px;
-    margin-bottom: 10px;
-}
-
-.hero p {
-    color: #edf5ff;
-    font-size: 16px;
-}
-
-.info-card {
-    background: #ffffff;
-    border: 1px solid #e4eaf3;
-    border-radius: 16px;
-    padding: 22px;
-    margin-bottom: 18px;
-    box-shadow: 0 3px 12px rgba(30,60,100,0.04);
-}
-
-.info-card h3 {
-    margin-top: 0;
-}
-
-.result-spam {
-    background: #fff1f2;
-    border: 1px solid #fecdd3;
-    border-left: 5px solid #e11d48;
-    border-radius: 14px;
-    padding: 24px;
-    color: #9f1239;
-}
-
-.result-normal {
-    background: #ecfdf5;
-    border: 1px solid #a7f3d0;
-    border-left: 5px solid #059669;
-    border-radius: 14px;
-    padding: 24px;
-    color: #065f46;
-}
-
-.result-spam h2 {
-    color: #be123c !important;
-}
-
-.result-normal h2 {
-    color: #047857 !important;
-}
-
-.result-spam p {
-    color: #9f1239;
-}
-
-.result-normal p {
-    color: #065f46;
-}
-
-.footer {
-    text-align: center;
-    color: #64748b;
-    padding: 20px;
-    font-size: 13px;
-}
-
-</style>
-""", unsafe_allow_html=True)
-
-
-# ----------------------------------
-# SESSION STATE
-# ----------------------------------
-
-if "total_scans" not in st.session_state:
-    st.session_state.total_scans = 0
-
-if "spam_scans" not in st.session_state:
-    st.session_state.spam_scans = 0
-
-if "normal_scans" not in st.session_state:
-    st.session_state.normal_scans = 0
-
-if "last_result" not in st.session_state:
-    st.session_state.last_result = None
-
-
-# ----------------------------------
-# SIDEBAR
-# ----------------------------------
-
-with st.sidebar:
-
-    st.title("🛡️ SMS Guardian AI")
-
-    st.caption("Intelligent Message Security")
-
-    st.divider()
-
-    st.markdown("### Navigation")
-
-    page = st.radio(
-        "Select Page",
-        [
-            "Dashboard",
-            "About Project"
-        ],
-        label_visibility="collapsed"
+    return any(
+        re.search(pattern, message, re.IGNORECASE)
+        for pattern in patterns
     )
 
-    st.divider()
 
-    st.markdown("### Machine Learning")
+# ---------------- SESSION STATE ----------------
+if "history" not in st.session_state:
+    st.session_state.history = []
 
-    st.write("Model: Multinomial Naive Bayes")
-    st.write("Feature Extraction: TF-IDF")
-    st.write("Language: Python")
-    st.write("Framework: Streamlit")
+if "result" not in st.session_state:
+    st.session_state.result = None
 
-    st.divider()
+if "message" not in st.session_state:
+    st.session_state.message = ""
 
-    st.success("● ML Model Loaded")
+if "spam_probability" not in st.session_state:
+    st.session_state.spam_probability = 0.0
+
+if "rule_detected" not in st.session_state:
+    st.session_state.rule_detected = False
 
 
-# ----------------------------------
-# DASHBOARD
-# ----------------------------------
+# ---------------- SIDEBAR ----------------
+st.sidebar.title("🛡️ CYBER SECURITY")
+st.sidebar.caption("AI SMS Protection System")
 
+page = st.sidebar.radio(
+    "Navigation",
+    [
+        "Dashboard",
+        "Detection History",
+        "About Project"
+    ]
+)
+
+st.sidebar.markdown("---")
+st.sidebar.success("ML Model: LOADED")
+st.sidebar.info("System Status: ACTIVE")
+
+
+# ---------------- DASHBOARD ----------------
 if page == "Dashboard":
 
-    st.markdown("""
-    <div class="hero">
-        <h1>🛡️ AI SMS Spam Detector</h1>
-        <p>
-        Smart SMS Security powered by
-        Machine Learning and Natural Language Processing.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.title("📩 SMS SPAM DETECTION")
+    st.write("Machine Learning Based SMS Security System")
 
-    # Dashboard Statistics
+    total = len(st.session_state.history)
 
-    st.subheader("📊 Dashboard Overview")
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.metric(
-            "Total Messages Scanned",
-            st.session_state.total_scans
-        )
-
-    with col2:
-        st.metric(
-            "Spam Detected",
-            st.session_state.spam_scans
-        )
-
-    with col3:
-        st.metric(
-            "Normal Messages",
-            st.session_state.normal_scans
-        )
-
-    st.caption(
-        "Statistics are for your current session only."
+    spam_count = sum(
+        1 for x in st.session_state.history
+        if x["result"] == "spam"
     )
 
-    st.divider()
+    normal_count = sum(
+        1 for x in st.session_state.history
+        if x["result"] == "normal"
+    )
 
-    # Message Input
+    c1, c2, c3 = st.columns(3)
 
-    st.subheader("📩 SMS Message Analysis")
+    c1.metric("Total Scans", total)
+    c2.metric("Spam Messages", spam_count)
+    c3.metric("Normal Messages", normal_count)
 
-    st.markdown("""
-    <div class="info-card">
-        <h3>Analyze Your Message</h3>
-        <p>
-        Enter an SMS message below to check
-        whether it is Spam or Normal.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown("---")
+    st.subheader("🔍 SMS Security Scanner")
 
     message = st.text_area(
-        "Enter SMS Message",
-        placeholder="Type or paste your SMS here...",
-        height=160
+        "Enter your SMS:",
+        value=st.session_state.message,
+        height=130,
+        placeholder="Enter or paste your SMS here..."
     )
 
-    analyze = st.button(
-        "🔍 Analyze Message",
+    if st.button(
+        "🚀 SCAN MESSAGE",
         use_container_width=True
-    )
+    ):
 
-    # ----------------------------------
-    # ML PREDICTION
-    # ----------------------------------
+        if message.strip():
 
-    if analyze:
-
-        if not message.strip():
-
-            st.warning(
-                "Please enter an SMS message."
-            )
-
-        else:
-
-            message_vector = vectorizer.transform(
+            # TF-IDF Transformation
+            msg_vector = vectorizer.transform(
                 [message]
             )
 
-            prediction = model.predict(
-                message_vector
-            )[0]
+            # ML Prediction
+            prediction = str(
+                model.predict(msg_vector)[0]
+            ).lower().strip()
 
+            # Model Probability
             probabilities = model.predict_proba(
-                message_vector
+                msg_vector
             )[0]
 
             spam_index = list(
@@ -340,202 +200,257 @@ if page == "Dashboard":
                 probabilities[spam_index]
             ) * 100
 
-            confidence = (
-                spam_probability
-                if prediction == "spam"
-                else 100 - spam_probability
+            # Additional Spam Rules
+            suspicious = check_suspicious_sms(
+                message
             )
 
-            # Update Statistics
-
-            st.session_state.total_scans += 1
-
-            if prediction == "spam":
-                st.session_state.spam_scans += 1
+            if prediction == "spam" or suspicious:
+                result = "spam"
             else:
-                st.session_state.normal_scans += 1
+                result = "normal"
 
-            st.session_state.last_result = {
-                "message": message,
-                "prediction": prediction,
-                "spam_probability": spam_probability,
-                "confidence": confidence
-            }
+            # Save Session Result
+            st.session_state.result = result
+            st.session_state.message = message
+            st.session_state.spam_probability = spam_probability
+            st.session_state.rule_detected = suspicious
 
-    # ----------------------------------
-    # DISPLAY RESULT
-    # ----------------------------------
+            st.session_state.history.insert(
+                0,
+                {
+                    "message": message,
+                    "result": result,
+                    "spam_probability": spam_probability
+                }
+            )
 
-    result = st.session_state.last_result
+        else:
+            st.warning("Please enter an SMS first.")
 
-    if result is not None:
 
-        st.divider()
+    # ---------------- RESULT ----------------
+    if st.session_state.result is not None:
 
-        st.subheader("📋 Analysis Result")
+        result = st.session_state.result
 
-        prediction = result["prediction"]
-
-        if prediction == "spam":
+        if result == "spam":
 
             st.markdown("""
-            <div class="result-spam">
-                <h2>🚨 SPAM DETECTED</h2>
-                <p>
-                This message may contain
-                suspicious or unwanted content.
-                </p>
+            <div style="
+                background:#421414;
+                border:2px solid #ff3030;
+                padding:25px;
+                border-radius:15px;
+                text-align:center;
+            ">
+                <h1 style="color:#ff3030 !important;">
+                    ⚠️ SPAM MESSAGE DETECTED
+                </h1>
+
+                <h3 style="color:white !important;">
+                    SUSPICIOUS MESSAGE - BE CAREFUL
+                </h3>
+
+                <div style="
+                    width:35px;
+                    height:35px;
+                    border-radius:50%;
+                    background:#ff2020;
+                    margin:20px auto;
+                    box-shadow:0 0 30px red;
+                    animation:redblink 1s infinite;
+                "></div>
+
+                <h3 style="color:#ff3030 !important;">
+                    🔴 RED ALERT
+                </h3>
             </div>
+
+            <style>
+            @keyframes redblink {
+                0%,100% {
+                    opacity:1;
+                    box-shadow:0 0 30px red;
+                }
+                50% {
+                    opacity:0.2;
+                    box-shadow:0 0 5px red;
+                }
+            }
+            </style>
             """, unsafe_allow_html=True)
 
+            st.error(
+                "⚠️ Warning: This SMS may be fraudulent."
+            )
+
+            if st.button("🔊 PLAY ALARM"):
+                components.html("""
+                <audio controls autoplay>
+                    <source
+                    src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"
+                    type="audio/ogg">
+                </audio>
+                """, height=65)
+
+        # ---------------- NORMAL RESULT ----------------
         else:
 
             st.markdown("""
-            <div class="result-normal">
-                <h2>✅ NORMAL MESSAGE</h2>
-                <p>
-                The model classified this
-                message as normal.
-                </p>
+            <div style="
+                background:#103528;
+                border:2px solid #00ff88;
+                padding:25px;
+                border-radius:15px;
+                text-align:center;
+            ">
+                <h1 style="color:#00ff88 !important;">
+                    ✅ NORMAL MESSAGE
+                </h1>
+
+                <h3 style="color:white !important;">
+                    NO SPAM DETECTED
+                </h3>
+
+                <div style="
+                    width:35px;
+                    height:35px;
+                    border-radius:50%;
+                    background:#00ff88;
+                    margin:20px auto;
+                    box-shadow:0 0 30px #00ff88;
+                    animation:greenblink 1s infinite;
+                "></div>
+
+                <h3 style="color:#00ff88 !important;">
+                    🟢 GREEN SAFE
+                </h3>
             </div>
+
+            <style>
+            @keyframes greenblink {
+                0%,100% {
+                    opacity:1;
+                    box-shadow:0 0 30px #00ff88;
+                }
+                50% {
+                    opacity:0.25;
+                    box-shadow:0 0 5px #00ff88;
+                }
+            }
+            </style>
             """, unsafe_allow_html=True)
 
-        st.write("")
-
-        result_col1, result_col2 = st.columns(2)
-
-        with result_col1:
-
-            st.metric(
-                "Spam Probability",
-                f"{result['spam_probability']:.2f}%"
+            st.success(
+                "✅ This message is classified as NORMAL."
             )
 
-        with result_col2:
+        # ---------------- PROBABILITY ----------------
+        st.markdown("---")
+        st.subheader("📊 ML Analysis")
 
-            st.metric(
-                "Model Confidence",
-                f"{result['confidence']:.2f}%"
-            )
+        probability = st.session_state.spam_probability
 
-        st.subheader("📈 Spam Probability")
+        st.metric(
+            "ML Spam Probability",
+            f"{probability:.2f}%"
+        )
 
         st.progress(
-            min(
-                max(
-                    result["spam_probability"] / 100,
-                    0.0
-                ),
-                1.0
-            )
+            min(max(probability / 100, 0.0), 1.0)
         )
+
+        if st.session_state.rule_detected:
+            st.info(
+                "Suspicious keyword pattern detected. "
+                "The final result also uses rule-based detection."
+            )
 
         st.caption(
-            "Probabilities are model estimates, "
-            "not calibrated guarantees."
+            "Probability is an ML estimate, not a safety guarantee."
         )
 
-        # Message Statistics
 
-        st.subheader("📊 Message Statistics")
+# ---------------- DETECTION HISTORY ----------------
+elif page == "Detection History":
 
-        analyzed_message = result["message"]
+    st.title("📋 DETECTION HISTORY")
 
-        word_count = len(
-            analyzed_message.split()
-        )
+    if st.session_state.history:
 
-        char_count = len(analyzed_message)
+        for i, item in enumerate(
+            st.session_state.history,
+            start=1
+        ):
 
-        url_count = len(
-            re.findall(
-                r"https?://\\S+|www\\.\\S+",
-                analyzed_message
-            )
-        )
-
-        stat1, stat2, stat3 = st.columns(3)
-
-        stat1.metric("Words", word_count)
-        stat2.metric("Characters", char_count)
-        stat3.metric("URLs", url_count)
-
-        st.markdown("### Analyzed Message")
-
-        st.info(analyzed_message)
-
-        if prediction == "spam":
-            st.warning(
-                "Avoid clicking suspicious links "
-                "or sharing personal information."
+            st.markdown(
+                f"**Scan {i}:**"
             )
 
-        else:
-            st.info(
-                "A normal classification does not "
-                "guarantee that a message is safe."
-            )
+            st.text(item["message"])
+
+            if item["result"] == "spam":
+                st.error("🔴 SPAM MESSAGE")
+            else:
+                st.success("🟢 NORMAL MESSAGE")
+
+            st.markdown("---")
+
+        if st.button("🗑️ CLEAR HISTORY"):
+
+            st.session_state.history = []
+            st.session_state.result = None
+            st.session_state.message = ""
+            st.session_state.spam_probability = 0.0
+            st.session_state.rule_detected = False
+
+            st.rerun()
+
+    else:
+        st.info("No detection history available.")
 
 
-# ----------------------------------
-# ABOUT PROJECT
-# ----------------------------------
-
+# ---------------- ABOUT PROJECT ----------------
 elif page == "About Project":
 
-    st.title("📘 About SMS Spam Detection")
+    st.title("ℹ️ ABOUT PROJECT")
 
     st.markdown("""
-    ### Project Overview
+    ### SMS Spam Detection System
 
-    SMS Spam Detection is a Machine Learning
-    based project designed to classify text
-    messages as Spam or Normal.
+    This project uses Machine Learning to identify
+    spam and normal SMS messages.
 
     ### Technologies Used
 
     - Python
     - Streamlit
-    - Pandas
     - Scikit-learn
     - TF-IDF Vectorizer
     - Multinomial Naive Bayes
 
-    ### Working Process
+    ### Features
 
-    1. User enters an SMS message.
-    2. Text is converted into TF-IDF features.
-    3. Trained ML model analyzes the message.
-    4. Model predicts Spam or Normal.
-    5. Website displays prediction and probability.
+    - SMS Spam Detection
+    - Trained Machine Learning Model
+    - Lottery Scam Detection Rules
+    - Red Blinking Spam Alert
+    - Green Blinking Normal Indicator
+    - Alarm Sound Button
+    - Spam Probability
+    - Detection History
 
-    ### Project Domain
+    ### Project Objective
 
-    - Machine Learning
-    - Natural Language Processing
-    - Cybersecurity
-
-    ### Dataset
-
-    UCI SMS Spam Collection Dataset
-
-    ### Objective
-
-    To develop an intelligent SMS classification
-    system using Machine Learning techniques.
+    To classify SMS messages and help identify
+    suspicious or unwanted messages.
     """)
 
 
-# ----------------------------------
-# FOOTER
-# ----------------------------------
+# ---------------- FOOTER ----------------
+st.markdown("---")
 
-st.divider()
-
-st.markdown("""
-<div class="footer">
-    AI SMS Spam Detector | Professional ML Dashboard
-    <br>
-    Built with Python, Scikit-learn and Streamlit
-</div>
-""", unsafe_allow_html=True)
+st.caption(
+    "🛡️ SMS Spam Detection | AI Cyber Security Project"
+)
