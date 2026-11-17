@@ -180,6 +180,13 @@ def check_suspicious_sms(message):
         r"\bkyc\s+(expired|pending|failed)\b",
         r"\bverify\s+your\s+bank\s+account\b",
 
+        
+         r"\bwon\b",
+        
+        r"\byou\s+(have\s+)?won\s+(a\s+)?car\b",
+
+
+
         # OTP / Password Fraud
         r"\bshare\s+your\s+otp\b",
         r"\bsend\s+(me\s+)?your\s+otp\b",
